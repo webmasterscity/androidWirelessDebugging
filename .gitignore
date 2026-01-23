@@ -1,0 +1,18 @@
+# Archivos de configuración local
+*.conf
+*.local
+
+# Archivos temporales
+*.tmp
+*.log
+*~
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

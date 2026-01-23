@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Conectar Android
+Name[es]=Conectar Android
+Comment=Connect Android device via WiFi debugging
+Comment[es]=Conectar dispositivo Android por WiFi
+Exec=conectar-android.sh
+Icon=phone
+Terminal=false
+Categories=Development;Utility;
+Keywords=android;adb;wireless;debug;wifi;
