@@ -8,14 +8,22 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
 ![Shell](https://img.shields.io/badge/shell-bash-orange)
 
+## Vista Previa
+
+![Conectar Android - Interfaz principal](screenshots/main-dialog.png)
+
+*Interfaz principal con acceso directo en el escritorio. Un doble clic y conecta tu Android por WiFi.*
+
 ## Características
 
+- **Acceso directo en el escritorio**: Un doble clic y listo, sin abrir terminal ni buscar en menús
 - **Conexión automática vía USB**: Conecta tu dispositivo por USB y automáticamente habilita WiFi debugging
 - **Conexión directa por IP**: Ingresa manualmente la IP y puerto del dispositivo
 - **Emparejamiento de dispositivos**: Soporte completo para el nuevo sistema de emparejamiento de Android 11+
 - **Búsqueda automática**: Escanea la red local para encontrar dispositivos Android
 - **Interfaz gráfica**: Usa Zenity para diálogos amigables (también funciona en terminal)
 - **Guarda configuración**: Recuerda la última conexión exitosa
+- **Instalación sencilla**: Un solo comando instala todo automáticamente
 
 ## Requisitos
 
@@ -31,9 +39,14 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 ```bash
 git clone https://github.com/webmasterscity/androidWirelessDebugging.git
 cd androidWirelessDebugging
-chmod +x install.sh
 ./install.sh
 ```
+
+El instalador automáticamente:
+- Instala las dependencias necesarias (ADB, Zenity)
+- Crea un **acceso directo en tu escritorio** para acceso rápido
+- Agrega la aplicación al menú de aplicaciones
+- Detecta tu distribución Linux (Ubuntu, Fedora, Arch, etc.)
 
 ### Opción 2: Instalación manual
 
@@ -55,6 +68,12 @@ cp conectar-android.desktop ~/.local/share/applications/
 ```
 
 ## Uso
+
+### Desde el escritorio (recomendado)
+
+Después de instalar, encontrarás el icono **"Conectar Android"** directamente en tu escritorio. Solo haz **doble clic** para conectar tu dispositivo Android por WiFi.
+
+> Esta es la forma más rápida y conveniente de usar la aplicación. No necesitas abrir terminal ni buscar en menús.
 
 ### Desde el menú de aplicaciones
 
@@ -134,6 +153,7 @@ O manualmente:
 ```bash
 rm ~/.local/bin/conectar-android.sh
 rm ~/.local/share/applications/conectar-android.desktop
+rm ~/Escritorio/conectar-android.desktop  # o ~/Desktop en inglés
 rm ~/.config/conectar-android.conf
 ```
 

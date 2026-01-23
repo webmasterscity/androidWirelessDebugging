@@ -13,7 +13,21 @@ NC='\033[0m' # Sin color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/.local/bin"
-DESKTOP_DIR="$HOME/.local/share/applications"
+APPS_DIR="$HOME/.local/share/applications"
+
+# Detectar directorio del escritorio (soporta diferentes idiomas)
+if command -v xdg-user-dir &> /dev/null; then
+    DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null)"
+fi
+# Fallback si xdg-user-dir no funciona
+if [[ -z "$DESKTOP_DIR" || ! -d "$DESKTOP_DIR" ]]; then
+    for dir in "$HOME/Desktop" "$HOME/Escritorio" "$HOME/Bureau" "$HOME/Schreibtisch"; do
+        if [[ -d "$dir" ]]; then
+            DESKTOP_DIR="$dir"
+            break
+        fi
+    done
+fi
 
 print_header() {
     echo -e "${BLUE}"
@@ -50,9 +64,14 @@ uninstall() {
         print_success "Script eliminado"
     fi
 
-    if [[ -f "$DESKTOP_DIR/conectar-android.desktop" ]]; then
+    if [[ -f "$APPS_DIR/conectar-android.desktop" ]]; then
+        rm -f "$APPS_DIR/conectar-android.desktop"
+        print_success "Acceso directo del menú eliminado"
+    fi
+
+    if [[ -n "$DESKTOP_DIR" && -f "$DESKTOP_DIR/conectar-android.desktop" ]]; then
         rm -f "$DESKTOP_DIR/conectar-android.desktop"
-        print_success "Acceso directo eliminado"
+        print_success "Acceso directo del escritorio eliminado"
     fi
 
     if [[ -f "$HOME/.config/conectar-android.conf" ]]; then
@@ -87,6 +106,7 @@ fi
 echo "Este script instalará:"
 echo "  - Script principal en ~/.local/bin/"
 echo "  - Acceso directo en el menú de aplicaciones"
+echo "  - Acceso directo en el escritorio (un clic para conectar)"
 echo ""
 
 # Verificar e instalar dependencias
@@ -167,7 +187,7 @@ echo ""
 
 # Crear directorios
 mkdir -p "$INSTALL_DIR"
-mkdir -p "$DESKTOP_DIR"
+mkdir -p "$APPS_DIR"
 
 # Copiar script principal
 cp "$SCRIPT_DIR/conectar-android.sh" "$INSTALL_DIR/"
@@ -175,8 +195,7 @@ chmod +x "$INSTALL_DIR/conectar-android.sh"
 print_success "Script instalado en $INSTALL_DIR/conectar-android.sh"
 
 # Crear archivo .desktop con ruta correcta
-cat > "$DESKTOP_DIR/conectar-android.desktop" << EOF
-[Desktop Entry]
+DESKTOP_CONTENT="[Desktop Entry]
 Version=1.0
 Type=Application
 Name=Conectar Android
@@ -187,14 +206,29 @@ Exec=$INSTALL_DIR/conectar-android.sh
 Icon=phone
 Terminal=false
 Categories=Development;Utility;
-Keywords=android;adb;wireless;debug;wifi;
-EOF
-chmod +x "$DESKTOP_DIR/conectar-android.desktop"
-print_success "Acceso directo instalado"
+Keywords=android;adb;wireless;debug;wifi;"
+
+# Instalar en menú de aplicaciones
+echo "$DESKTOP_CONTENT" > "$APPS_DIR/conectar-android.desktop"
+chmod +x "$APPS_DIR/conectar-android.desktop"
+print_success "Acceso directo en menú de aplicaciones instalado"
+
+# Instalar en escritorio
+if [[ -n "$DESKTOP_DIR" && -d "$DESKTOP_DIR" ]]; then
+    echo "$DESKTOP_CONTENT" > "$DESKTOP_DIR/conectar-android.desktop"
+    chmod +x "$DESKTOP_DIR/conectar-android.desktop"
+    # En GNOME, marcar como confiable para que sea ejecutable
+    if command -v gio &> /dev/null; then
+        gio set "$DESKTOP_DIR/conectar-android.desktop" metadata::trusted true 2>/dev/null || true
+    fi
+    print_success "Acceso directo en escritorio instalado ($DESKTOP_DIR)"
+else
+    print_warning "No se pudo detectar el directorio del escritorio"
+fi
 
 # Actualizar base de datos de aplicaciones
 if command -v update-desktop-database &> /dev/null; then
-    update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+    update-desktop-database "$APPS_DIR" 2>/dev/null || true
 fi
 
 # Verificar que ~/.local/bin está en PATH
@@ -210,13 +244,14 @@ fi
 
 echo ""
 echo -e "${GREEN}=============================================="
-echo "   Instalación completada exitosamente!"
+echo "   Instalacion completada exitosamente!"
 echo "==============================================${NC}"
 echo ""
-echo "Puedes usar la aplicación de estas formas:"
+echo "Puedes usar la aplicacion de estas formas:"
 echo ""
-echo "  1. Busca 'Conectar Android' en el menú de aplicaciones"
-echo "  2. Ejecuta: conectar-android.sh"
+echo "  1. Doble clic en 'Conectar Android' en tu escritorio"
+echo "  2. Busca 'Conectar Android' en el menu de aplicaciones"
+echo "  3. Ejecuta: conectar-android.sh"
 echo ""
 echo "Para desinstalar: ./install.sh --uninstall"
 echo ""
