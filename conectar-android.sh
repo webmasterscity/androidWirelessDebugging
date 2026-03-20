@@ -5,6 +5,7 @@ ADB="/home/leonardo/Android/Sdk/platform-tools/adb"
 CONFIG_DIR="$HOME/.config/conectar-android"
 DEVICES_FILE="$CONFIG_DIR/devices.conf"
 LAST_FILE="$CONFIG_DIR/last.conf"
+QR_VENV_DIR="$CONFIG_DIR/qr-venv"
 DEFAULT_IP="192.168.1.145"
 DEFAULT_PORT="5555"
 
@@ -113,6 +114,68 @@ notificar() {
 generar_token() {
     local longitud="$1"
     tr -dc 'a-z0-9' </dev/urandom | head -c "$longitud"
+}
+
+# Preparar un Python aislado con soporte QR
+obtener_python_qr() {
+    local venv_python="$QR_VENV_DIR/bin/python"
+
+    if [[ -x "$venv_python" ]] && "$venv_python" -c 'import qrcode' >/dev/null 2>&1; then
+        echo "$venv_python"
+        return 0
+    fi
+
+    if ! command -v python3 &> /dev/null; then
+        return 1
+    fi
+
+    mkdir -p "$QR_VENV_DIR"
+
+    if [[ ! -x "$venv_python" ]]; then
+        python3 -m venv "$QR_VENV_DIR" >/dev/null 2>&1 || return 1
+    fi
+
+    "$venv_python" -m pip install --upgrade pip >/dev/null 2>&1 || true
+    "$venv_python" -m pip install qrcode[pil] >/dev/null 2>&1 || return 1
+
+    "$venv_python" -c 'import qrcode' >/dev/null 2>&1 || return 1
+    echo "$venv_python"
+}
+
+# Generar un QR PNG usando qrcode en Python
+generar_qr_png() {
+    local data="$1"
+    local output="$2"
+    local python_qr="${3:-}"
+
+    if [[ -z "$python_qr" ]]; then
+        python_qr="$(obtener_python_qr)" || return 1
+    fi
+
+    "$python_qr" - "$data" "$output" <<'PY'
+import sys
+
+try:
+    import qrcode
+    from qrcode.constants import ERROR_CORRECT_M
+except Exception as exc:
+    print(f"qrcode unavailable: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+data = sys.argv[1]
+output = sys.argv[2]
+
+qr = qrcode.QRCode(
+    version=None,
+    error_correction=ERROR_CORRECT_M,
+    box_size=10,
+    border=2,
+)
+qr.add_data(data)
+qr.make(fit=True)
+img = qr.make_image(fill_color="black", back_color="white")
+img.save(output)
+PY
 }
 
 # Buscar una entrada mDNS exacta por nombre
@@ -283,9 +346,11 @@ emparejar_por_codigo() {
 
 # Función de emparejamiento por QR
 emparejar_por_qr() {
-    if ! command -v qrencode &> /dev/null; then
+    local python_qr
+
+    if ! python_qr="$(obtener_python_qr)"; then
         zenity --error --title="QR no disponible" \
-            --text="Falta la herramienta qrencode, necesaria para generar el QR.\n\nInstala el paquete 'qrencode' y vuelve a intentarlo." \
+            --text="No se pudo preparar el soporte QR.\n\nVerifica que python3 tenga soporte para venv (por ejemplo, el paquete python3-venv) y vuelve a intentarlo." \
             --width=400 2>/dev/null
         return 1
     fi
@@ -300,7 +365,7 @@ emparejar_por_qr() {
 
     qr_file="$(mktemp --suffix=.png)"
 
-    if ! qrencode -o "$qr_file" -s 10 -m 2 -l M "$qr_data"; then
+    if ! generar_qr_png "$qr_data" "$qr_file" "$python_qr"; then
         rm -f "$qr_file"
         zenity --error --title="Error generando QR" \
             --text="No se pudo generar el QR de emparejamiento." \

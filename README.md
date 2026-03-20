@@ -30,7 +30,7 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 - Linux (Ubuntu, Debian, Fedora, Arch, etc.)
 - ADB (Android Debug Bridge)
 - Zenity (opcional, para interfaz gráfica)
-- qrencode (para generar el QR de emparejamiento)
+- Python 3 con soporte `venv` para el emparejamiento por QR
 - libnotify (opcional, para notificaciones)
 
 ## Instalación
@@ -44,7 +44,8 @@ cd androidWirelessDebugging
 ```
 
 El instalador automáticamente:
-- Instala las dependencias necesarias (ADB, Zenity, qrencode)
+- Instala las dependencias necesarias (ADB, Zenity)
+- Prepara un entorno virtual privado para el soporte QR si hace falta
 - Crea un **acceso directo en tu escritorio** para acceso rápido
 - Agrega la aplicación al menú de aplicaciones
 - Detecta tu distribución Linux (Ubuntu, Fedora, Arch, etc.)
@@ -53,7 +54,12 @@ El instalador automáticamente:
 
 ```bash
 # Instalar dependencias
-sudo apt install adb zenity libnotify-bin qrencode
+sudo apt install adb zenity libnotify-bin
+
+# El soporte QR se prepara automáticamente al ejecutar ./install.sh
+# Si quieres prepararlo manualmente:
+python3 -m venv ~/.config/conectar-android/qr-venv
+~/.config/conectar-android/qr-venv/bin/pip install qrcode[pil]
 
 # Clonar repositorio
 git clone https://github.com/webmasterscity/androidWirelessDebugging.git

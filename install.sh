@@ -14,6 +14,7 @@ NC='\033[0m' # Sin color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/.local/bin"
 APPS_DIR="$HOME/.local/share/applications"
+QR_VENV_DIR="$HOME/.config/conectar-android/qr-venv"
 
 # Detectar directorio del escritorio (soporta diferentes idiomas)
 if command -v xdg-user-dir &> /dev/null; then
@@ -51,6 +52,28 @@ print_error() {
 
 print_info() {
     echo -e "${BLUE}[i]${NC} $1"
+}
+
+preparar_soporte_qr() {
+    local venv_python="$QR_VENV_DIR/bin/python"
+
+    if [[ -x "$venv_python" ]] && "$venv_python" -c 'import qrcode' >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! command -v python3 &> /dev/null; then
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$QR_VENV_DIR")"
+
+    if [[ ! -x "$venv_python" ]]; then
+        python3 -m venv "$QR_VENV_DIR" >/dev/null 2>&1 || return 1
+    fi
+
+    "$venv_python" -m pip install --upgrade pip >/dev/null 2>&1 || true
+    "$venv_python" -m pip install qrcode[pil] >/dev/null 2>&1 || return 1
+    "$venv_python" -c 'import qrcode' >/dev/null 2>&1
 }
 
 # Desinstalar
@@ -107,7 +130,7 @@ echo "Este script instalará:"
 echo "  - Script principal en ~/.local/bin/"
 echo "  - Acceso directo en el menú de aplicaciones"
 echo "  - Acceso directo en el escritorio (un clic para conectar)"
-echo "  - Emparejamiento por QR"
+echo "  - Emparejamiento por QR en un entorno privado de Python"
 echo ""
 
 # Verificar e instalar dependencias
@@ -136,12 +159,11 @@ else
     print_warning "Zenity no encontrado (opcional, para interfaz gráfica)"
 fi
 
-# qrencode
-if command -v qrencode &> /dev/null; then
-    print_success "qrencode encontrado"
+# Soporte QR vía Python
+if preparar_soporte_qr; then
+    print_success "Soporte QR preparado en $QR_VENV_DIR"
 else
-    print_warning "qrencode no encontrado (necesario para emparejamiento por QR)"
-    DEPS_MISSING=1
+    print_warning "No se pudo preparar soporte QR automáticamente"
     QR_MISSING=1
 fi
 
@@ -163,19 +185,19 @@ if [[ $DEPS_MISSING -eq 1 ]]; then
     if command -v apt &> /dev/null; then
         PKG_MGR="apt"
         PKG_INSTALL="sudo apt install -y"
-        PACKAGES="adb zenity libnotify-bin qrencode"
+        PACKAGES="adb zenity libnotify-bin"
     elif command -v dnf &> /dev/null; then
         PKG_MGR="dnf"
         PKG_INSTALL="sudo dnf install -y"
-        PACKAGES="android-tools zenity libnotify qrencode"
+        PACKAGES="android-tools zenity libnotify"
     elif command -v pacman &> /dev/null; then
         PKG_MGR="pacman"
         PKG_INSTALL="sudo pacman -S --noconfirm"
-        PACKAGES="android-tools zenity libnotify qrencode"
+        PACKAGES="android-tools zenity libnotify"
     elif command -v zypper &> /dev/null; then
         PKG_MGR="zypper"
         PKG_INSTALL="sudo zypper install -y"
-        PACKAGES="android-tools zenity libnotify-tools qrencode"
+        PACKAGES="android-tools zenity libnotify-tools"
     else
         print_error "No se detectó un gestor de paquetes conocido"
         print_info "Instala las dependencias manualmente antes de continuar"
@@ -190,11 +212,10 @@ if [[ $DEPS_MISSING -eq 1 ]]; then
         print_success "Dependencias instaladas"
     else
         print_warning "Continuando sin instalar dependencias"
-        if [[ $ADB_MISSING -eq 1 && $QR_MISSING -eq 1 ]]; then
-            print_info "La aplicación puede no funcionar correctamente sin ADB ni soporte QR"
-        elif [[ $ADB_MISSING -eq 1 ]]; then
+        if [[ $ADB_MISSING -eq 1 ]]; then
             print_info "La aplicación puede no funcionar correctamente sin ADB"
-        elif [[ $QR_MISSING -eq 1 ]]; then
+        fi
+        if [[ $QR_MISSING -eq 1 ]]; then
             print_info "La opción de emparejamiento por QR no estará disponible"
         fi
     fi
