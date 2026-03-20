@@ -19,7 +19,7 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 - **Acceso directo en el escritorio**: Un doble clic y listo, sin abrir terminal ni buscar en menús
 - **Conexión automática vía USB**: Conecta tu dispositivo por USB y automáticamente habilita WiFi debugging
 - **Conexión directa por IP**: Ingresa manualmente la IP y puerto del dispositivo
-- **Emparejamiento de dispositivos**: Soporte completo para el nuevo sistema de emparejamiento de Android 11+
+- **Emparejamiento de dispositivos**: Soporte completo para el nuevo sistema de emparejamiento de Android 11+, con código o QR
 - **Búsqueda automática**: Escanea la red local para encontrar dispositivos Android
 - **Interfaz gráfica**: Usa Zenity para diálogos amigables (también funciona en terminal)
 - **Guarda configuración**: Recuerda la última conexión exitosa
@@ -30,6 +30,7 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 - Linux (Ubuntu, Debian, Fedora, Arch, etc.)
 - ADB (Android Debug Bridge)
 - Zenity (opcional, para interfaz gráfica)
+- qrencode (para generar el QR de emparejamiento)
 - libnotify (opcional, para notificaciones)
 
 ## Instalación
@@ -43,7 +44,7 @@ cd androidWirelessDebugging
 ```
 
 El instalador automáticamente:
-- Instala las dependencias necesarias (ADB, Zenity)
+- Instala las dependencias necesarias (ADB, Zenity, qrencode)
 - Crea un **acceso directo en tu escritorio** para acceso rápido
 - Agrega la aplicación al menú de aplicaciones
 - Detecta tu distribución Linux (Ubuntu, Fedora, Arch, etc.)
@@ -52,7 +53,7 @@ El instalador automáticamente:
 
 ```bash
 # Instalar dependencias
-sudo apt install adb zenity libnotify-bin
+sudo apt install adb zenity libnotify-bin qrencode
 
 # Clonar repositorio
 git clone https://github.com/webmasterscity/androidWirelessDebugging.git
@@ -96,10 +97,9 @@ conectar-android.sh
 
 1. En tu Android ve a **Configuración > Opciones de desarrollador > Depuración inalámbrica**
 2. Activa "Depuración inalámbrica"
-3. Si es la primera vez, presiona "Emparejar" en la app:
-   - Toca "Emparejar dispositivo con código" en tu Android
-   - Ingresa la IP:Puerto de emparejamiento
-   - Ingresa el código de 6 dígitos
+3. Si es la primera vez, presiona "Emparejar" en la app y elige el método:
+   - **Por código**: toca "Emparejar dispositivo con código" en tu Android, ingresa la IP:Puerto de emparejamiento y el código de 6 dígitos
+   - **Por QR**: toca "Emparejar dispositivo con QR code" en tu Android y escanea el QR que muestra la app
 4. Usa la IP:Puerto de conexión (diferente al de emparejamiento) para conectar
 
 ## Configuración en Android

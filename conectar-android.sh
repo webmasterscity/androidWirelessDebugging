@@ -109,6 +109,74 @@ notificar() {
     notify-send "$1" "$2" -i "${3:-phone}"
 }
 
+# Generar un token aleatorio simple para nombres y códigos
+generar_token() {
+    local longitud="$1"
+    tr -dc 'a-z0-9' </dev/urandom | head -c "$longitud"
+}
+
+# Buscar una entrada mDNS exacta por nombre
+obtener_servicio_mdns_por_nombre() {
+    local service_type="$1"
+    local service_name="$2"
+
+    $ADB mdns services 2>/dev/null | awk -v type="$service_type" -v name="$service_name" '
+        $1 == name && $2 == type { print $3; exit }
+    '
+}
+
+# Buscar una entrada mDNS por IP
+obtener_servicio_mdns_por_ip() {
+    local service_type="$1"
+    local ip="$2"
+
+    $ADB mdns services 2>/dev/null | awk -v type="$service_type" -v ip="$ip" '
+        $2 == type && index($3, ip ":") == 1 { print $3; exit }
+    '
+}
+
+# Esperar una entrada mDNS exacta por nombre
+esperar_servicio_mdns_por_nombre() {
+    local service_type="$1"
+    local service_name="$2"
+    local timeout="${3:-60}"
+    local elapsed=0
+
+    while (( elapsed < timeout )); do
+        local addr
+        addr="$(obtener_servicio_mdns_por_nombre "$service_type" "$service_name")"
+        if [[ -n "$addr" ]]; then
+            echo "$addr"
+            return 0
+        fi
+        sleep 1
+        ((elapsed++))
+    done
+
+    return 1
+}
+
+# Esperar una entrada mDNS por IP
+esperar_servicio_mdns_por_ip() {
+    local service_type="$1"
+    local ip="$2"
+    local timeout="${3:-60}"
+    local elapsed=0
+
+    while (( elapsed < timeout )); do
+        local addr
+        addr="$(obtener_servicio_mdns_por_ip "$service_type" "$ip")"
+        if [[ -n "$addr" ]]; then
+            echo "$addr"
+            return 0
+        fi
+        sleep 1
+        ((elapsed++))
+    done
+
+    return 1
+}
+
 # Búsqueda rápida
 buscar_dispositivos() {
     local temp_file=$(mktemp)
@@ -155,8 +223,8 @@ buscar_dispositivos() {
     echo -e "$encontrados" | grep -v "^$" | sort -u
 }
 
-# Función de emparejamiento
-emparejar_dispositivo() {
+# Función de emparejamiento por código
+emparejar_por_codigo() {
     # Paso 1: Pedir IP:Puerto
     local pair_addr=$(zenity --entry \
         --title="Emparejar Android - Paso 1/2" \
@@ -189,10 +257,19 @@ emparejar_dispositivo() {
     if echo "$resultado" | grep -qiE "success|paired"; then
         # Extraer IP para guardarla
         local paired_ip="${pair_addr%:*}"
-        guardar_config "$paired_ip" "$LAST_PORT"
+        local connect_addr
+        local mensaje_exito
+        connect_addr="$(esperar_servicio_mdns_por_ip "_adb-tls-connect._tcp" "$paired_ip" 8)"
+        if [[ -n "$connect_addr" ]]; then
+            guardar_config "${connect_addr%:*}" "${connect_addr##*:}"
+            mensaje_exito="Dispositivo emparejado correctamente.\n\nYa quedó guardado para conectar en la pantalla principal:\n\n$connect_addr"
+        else
+            guardar_config "$paired_ip" "$LAST_PORT"
+            mensaje_exito="Dispositivo emparejado correctamente.\n\nAhora conecta usando el puerto de CONEXIÓN\n(es diferente al de emparejamiento).\n\nBúscalo en: Depuración inalámbrica → IP y puerto"
+        fi
 
         zenity --info --title="✓ Emparejado" \
-            --text="Dispositivo emparejado correctamente.\n\nAhora conecta usando el puerto de CONEXIÓN\n(es diferente al de emparejamiento).\n\nBúscalo en: Depuración inalámbrica → IP y puerto" \
+            --text="$mensaje_exito" \
             --width=400 2>/dev/null
         notificar "Emparejado" "Dispositivo emparejado correctamente" "phone"
         return 0
@@ -202,6 +279,111 @@ emparejar_dispositivo() {
             --width=420 2>/dev/null
         return 1
     fi
+}
+
+# Función de emparejamiento por QR
+emparejar_por_qr() {
+    if ! command -v qrencode &> /dev/null; then
+        zenity --error --title="QR no disponible" \
+            --text="Falta la herramienta qrencode, necesaria para generar el QR.\n\nInstala el paquete 'qrencode' y vuelve a intentarlo." \
+            --width=400 2>/dev/null
+        return 1
+    fi
+
+    local pair_name="studio-$(generar_token 10)"
+    local pair_code="$(tr -dc '0-9' </dev/urandom | head -c 10)"
+    local qr_data="WIFI:T:ADB;S:${pair_name};P:${pair_code};;"
+    local qr_file
+    local pair_addr
+    local connect_addr
+    local resultado
+
+    qr_file="$(mktemp --suffix=.png)"
+
+    if ! qrencode -o "$qr_file" -s 10 -m 2 -l M "$qr_data"; then
+        rm -f "$qr_file"
+        zenity --error --title="Error generando QR" \
+            --text="No se pudo generar el QR de emparejamiento." \
+            --width=350 2>/dev/null
+        return 1
+    fi
+
+    zenity --info \
+        --title="Emparejar Android - QR" \
+        --text="En tu teléfono ve a:\n\n  📱 Configuración\n  → Opciones de desarrollador\n  → Depuración inalámbrica\n  → Emparejar dispositivo con QR code\n\nEscanea este QR y luego pulsa Aceptar para continuar." \
+        --image="$qr_file" \
+        --width=520 \
+        --height=650 \
+        2>/dev/null
+    local qr_info_rc=$?
+    rm -f "$qr_file"
+
+    [[ $qr_info_rc -ne 0 ]] && return 1
+
+    notificar "Emparejando..." "Esperando el servicio de QR..." "network-wireless"
+
+    pair_addr="$(esperar_servicio_mdns_por_nombre "_adb-tls-pairing._tcp" "$pair_name" 90)"
+    if [[ -z "$pair_addr" ]]; then
+        zenity --error --title="QR no detectado" \
+            --text="No se encontró el servicio de emparejamiento del QR.\n\nVerifica que hayas escaneado el código en el teléfono y vuelve a intentarlo." \
+            --width=400 2>/dev/null
+        return 1
+    fi
+
+    resultado=$($ADB pair "$pair_addr" "$pair_code" 2>&1)
+
+    if echo "$resultado" | grep -qiE "success|paired"; then
+        local paired_ip="${pair_addr%:*}"
+        local mensaje_exito
+        connect_addr="$(esperar_servicio_mdns_por_ip "_adb-tls-connect._tcp" "$paired_ip" 8)"
+        if [[ -n "$connect_addr" ]]; then
+            guardar_config "${connect_addr%:*}" "${connect_addr##*:}"
+            mensaje_exito="Dispositivo emparejado correctamente por QR.\n\nYa quedó guardado para conectar desde la pantalla principal:\n\n$connect_addr"
+        else
+            mensaje_exito="Dispositivo emparejado correctamente por QR.\n\nAbre Depuración inalámbrica en tu teléfono y toma nota del puerto de conexión para usarlo en la pantalla principal."
+        fi
+
+        zenity --info --title="✓ Emparejado por QR" \
+            --text="$mensaje_exito" \
+            --width=420 2>/dev/null
+        notificar "Emparejado" "Dispositivo emparejado correctamente por QR" "phone"
+        return 0
+    else
+        zenity --error --title="Error de Emparejamiento" \
+            --text="No se pudo emparejar por QR:\n\n$resultado" \
+            --width=420 2>/dev/null
+        return 1
+    fi
+}
+
+# Elegir método de emparejamiento
+emparejar_dispositivo() {
+    local seleccion
+
+    seleccion=$(zenity --list \
+        --title="Emparejar Android" \
+        --text="Elige cómo quieres emparejar el dispositivo:" \
+        --radiolist \
+        --column="Sel" --column="Método" --column="Detalle" \
+        TRUE "📶 Emparejar por código" "Flujo clásico: ingresa IP:puerto y código manualmente" \
+        FALSE "📷 Emparejar por QR" "Genera un QR para escanear desde el teléfono" \
+        --width=560 --height=260 \
+        --ok-label="Continuar" \
+        --cancel-label="Cancelar" \
+        --print-column=2 \
+        2>&1)
+
+    case "$seleccion" in
+        "📶 Emparejar por código")
+            emparejar_por_codigo
+            ;;
+        "📷 Emparejar por QR")
+            emparejar_por_qr
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 # Verificar USB primero

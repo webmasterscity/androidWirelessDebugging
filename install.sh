@@ -107,6 +107,7 @@ echo "Este script instalará:"
 echo "  - Script principal en ~/.local/bin/"
 echo "  - Acceso directo en el menú de aplicaciones"
 echo "  - Acceso directo en el escritorio (un clic para conectar)"
+echo "  - Emparejamiento por QR"
 echo ""
 
 # Verificar e instalar dependencias
@@ -114,6 +115,8 @@ echo "Verificando dependencias..."
 echo ""
 
 DEPS_MISSING=0
+ADB_MISSING=0
+QR_MISSING=0
 
 # ADB
 if command -v adb &> /dev/null; then
@@ -123,6 +126,7 @@ elif [[ -f "$HOME/Android/Sdk/platform-tools/adb" ]]; then
 else
     print_warning "ADB no encontrado"
     DEPS_MISSING=1
+    ADB_MISSING=1
 fi
 
 # Zenity
@@ -130,6 +134,15 @@ if command -v zenity &> /dev/null; then
     print_success "Zenity encontrado"
 else
     print_warning "Zenity no encontrado (opcional, para interfaz gráfica)"
+fi
+
+# qrencode
+if command -v qrencode &> /dev/null; then
+    print_success "qrencode encontrado"
+else
+    print_warning "qrencode no encontrado (necesario para emparejamiento por QR)"
+    DEPS_MISSING=1
+    QR_MISSING=1
 fi
 
 # notify-send
@@ -150,22 +163,22 @@ if [[ $DEPS_MISSING -eq 1 ]]; then
     if command -v apt &> /dev/null; then
         PKG_MGR="apt"
         PKG_INSTALL="sudo apt install -y"
-        PACKAGES="adb zenity libnotify-bin"
+        PACKAGES="adb zenity libnotify-bin qrencode"
     elif command -v dnf &> /dev/null; then
         PKG_MGR="dnf"
         PKG_INSTALL="sudo dnf install -y"
-        PACKAGES="android-tools zenity libnotify"
+        PACKAGES="android-tools zenity libnotify qrencode"
     elif command -v pacman &> /dev/null; then
         PKG_MGR="pacman"
         PKG_INSTALL="sudo pacman -S --noconfirm"
-        PACKAGES="android-tools zenity libnotify"
+        PACKAGES="android-tools zenity libnotify qrencode"
     elif command -v zypper &> /dev/null; then
         PKG_MGR="zypper"
         PKG_INSTALL="sudo zypper install -y"
-        PACKAGES="android-tools zenity libnotify-tools"
+        PACKAGES="android-tools zenity libnotify-tools qrencode"
     else
         print_error "No se detectó un gestor de paquetes conocido"
-        print_info "Instala ADB manualmente antes de continuar"
+        print_info "Instala las dependencias manualmente antes de continuar"
         exit 1
     fi
 
@@ -177,7 +190,13 @@ if [[ $DEPS_MISSING -eq 1 ]]; then
         print_success "Dependencias instaladas"
     else
         print_warning "Continuando sin instalar dependencias"
-        print_info "La aplicación puede no funcionar correctamente sin ADB"
+        if [[ $ADB_MISSING -eq 1 && $QR_MISSING -eq 1 ]]; then
+            print_info "La aplicación puede no funcionar correctamente sin ADB ni soporte QR"
+        elif [[ $ADB_MISSING -eq 1 ]]; then
+            print_info "La aplicación puede no funcionar correctamente sin ADB"
+        elif [[ $QR_MISSING -eq 1 ]]; then
+            print_info "La opción de emparejamiento por QR no estará disponible"
+        fi
     fi
 fi
 
@@ -252,6 +271,7 @@ echo ""
 echo "  1. Doble clic en 'Conectar Android' en tu escritorio"
 echo "  2. Busca 'Conectar Android' en el menu de aplicaciones"
 echo "  3. Ejecuta: conectar-android.sh"
+echo "  4. Desde 'Emparejar', elige código o QR"
 echo ""
 echo "Para desinstalar: ./install.sh --uninstall"
 echo ""
