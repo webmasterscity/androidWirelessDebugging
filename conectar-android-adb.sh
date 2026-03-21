@@ -346,7 +346,7 @@ case "$cmd" in
         ;;
 
     usb-check)
-        usb_dev=$($ADB devices 2>/dev/null | grep -v "List" | grep "device$" | grep -v ":" | head -1 | cut -f1)
+        usb_dev=$($ADB devices 2>/dev/null | grep -v "List" | grep "device$" | grep -v ":" | grep -v "^adb-" | head -1 | cut -f1)
         if [[ -n "$usb_dev" ]]; then
             dev_ip=$($ADB -s "$usb_dev" shell "ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1" 2>/dev/null | tr -d '\r')
             echo "USB:${usb_dev}|IP:${dev_ip:-unknown}"
