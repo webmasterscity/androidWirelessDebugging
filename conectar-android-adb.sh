@@ -184,18 +184,24 @@ buscar_dispositivos() {
         fi
     done < <($ADB mdns services 2>/dev/null)
 
-    # Escaneo rápido
-    local mi_ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
-    local red_base="${mi_ip%.*}"
+    # Escaneo rápido — buscar en TODAS las redes locales (no solo la ruta por defecto,
+    # que puede ser una VPN en vez de la WiFi donde están los Android)
+    local redes_base=()
+    while IFS= read -r net_ip; do
+        local base="${net_ip%.*}"
+        [[ -n "$base" && "$base" != "127.0.0" ]] && redes_base+=("$base")
+    done < <(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
 
-    if [[ -n "$red_base" ]]; then
+    if [[ ${#redes_base[@]} -gt 0 ]]; then
         local ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 120 125 130 140 142 145 150 200)
         local puertos=(5555 33000 33279 37000 39000 39723 41000 42000 43000 43543 44000 44335 44359 45000)
 
-        for oct in "${ips[@]}"; do
-            for puerto in "${puertos[@]}"; do
-                (timeout 0.15 bash -c "echo >/dev/tcp/${red_base}.${oct}/$puerto" 2>/dev/null && \
-                    echo "${red_base}.${oct}:${puerto}" >> "$temp_file") &
+        for red_base in "${redes_base[@]}"; do
+            for oct in "${ips[@]}"; do
+                for puerto in "${puertos[@]}"; do
+                    (timeout 0.15 bash -c "echo >/dev/tcp/${red_base}.${oct}/$puerto" 2>/dev/null && \
+                        echo "${red_base}.${oct}:${puerto}" >> "$temp_file") &
+                done
             done
         done
         wait
