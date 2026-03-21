@@ -184,37 +184,37 @@ buscar_dispositivos() {
         fi
     done < <($ADB mdns services 2>/dev/null)
 
-    # Fase 1: Escanear IPs de dispositivos guardados en rango completo de puertos.
-    # Android wireless debugging usa puertos aleatorios en ~30000-50000 que
-    # cambian cada vez, así que una lista fija de puertos no sirve.
-    local ips_guardadas=()
+    # Recopilar IPs candidatas: ARP (hosts vivos en la red) + dispositivos guardados.
+    # Esto encuentra dispositivos aunque el router les haya cambiado la IP.
+    local mi_ip
+    mi_ip=$(ip -4 -o addr show dev wlo1 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    [[ -z "$mi_ip" ]] && mi_ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+    local mi_red="${mi_ip%.*}"
+
+    local -A scan_ips=()
+
+    # IPs desde la tabla ARP (hosts que han comunicado recientemente)
+    while IFS= read -r arp_ip; do
+        [[ "$arp_ip" == "$mi_ip" ]] && continue
+        [[ "$arp_ip" == "${mi_red}.1" ]] && continue  # skip router
+        [[ "$arp_ip" == "$mi_red"* ]] && scan_ips["$arp_ip"]=1
+    done < <(ip neigh show 2>/dev/null | grep -v FAILED | awk '{print $1}')
+
+    # IPs de dispositivos guardados
     if [[ -f "$DEVICES_FILE" ]]; then
         while IFS='|' read -r _ addr; do
             local saved_ip="${addr%:*}"
-            [[ -n "$saved_ip" ]] && ips_guardadas+=("$saved_ip")
+            [[ -n "$saved_ip" ]] && scan_ips["$saved_ip"]=1
         done < "$DEVICES_FILE"
     fi
 
-    for ip in "${ips_guardadas[@]}"; do
+    # Escanear rango completo de puertos wireless debugging (30000-50000)
+    # en todas las IPs candidatas, en lotes de 1000 para no saturar
+    for ip in "${!scan_ips[@]}"; do
         for port in $(seq 30000 50000) 5555; do
             (timeout 0.08 bash -c "echo >/dev/tcp/${ip}/$port" 2>/dev/null && \
                 echo "${ip}:${port}" >> "$temp_file") &
             (( port % 1000 == 0 )) && wait
-        done
-    done
-
-    # Fase 2: Descubrir nuevos dispositivos en la red local (puerto 5555 clásico)
-    local redes_base=()
-    while IFS= read -r net_ip; do
-        local base="${net_ip%.*}"
-        [[ -n "$base" && "$base" != "127.0.0" ]] && redes_base+=("$base")
-    done < <(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
-
-    local discovery_ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 120 125 130 140 142 145 150 200)
-    for red_base in "${redes_base[@]}"; do
-        for oct in "${discovery_ips[@]}"; do
-            (timeout 0.15 bash -c "echo >/dev/tcp/${red_base}.${oct}/5555" 2>/dev/null && \
-                echo "${red_base}.${oct}:5555" >> "$temp_file") &
         done
     done
 
