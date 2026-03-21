@@ -423,8 +423,8 @@ class MainWindow(Adw.ApplicationWindow):
             if found:
                 if len(found) == 1:
                     self.entry_row.set_text(found[0][0])
-                    self.show_toast("1 dispositivo encontrado")
-                    self.refresh_devices()
+                    self.show_toast("1 dispositivo encontrado — conectando...")
+                    self.on_connect()
                     return
                 # Mostrar diálogo de selección con todos los resultados
                 dialog = Adw.AlertDialog(heading="Dispositivos encontrados",
