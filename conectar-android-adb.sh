@@ -189,8 +189,8 @@ buscar_dispositivos() {
     local red_base="${mi_ip%.*}"
 
     if [[ -n "$red_base" ]]; then
-        local ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 145 200)
-        local puertos=(5555 43543 37000 41000 43000 44000 45000)
+        local ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 120 125 130 140 142 145 150 200)
+        local puertos=(5555 33000 33279 37000 39000 39723 41000 42000 43000 43543 44000 44335 44359 45000)
 
         for oct in "${ips[@]}"; do
             for puerto in "${puertos[@]}"; do
@@ -208,7 +208,7 @@ buscar_dispositivos() {
     fi
 
     rm -f "$temp_file"
-    echo -e "$encontrados" | grep -v "^$" | sort -u
+    echo -e "$encontrados" | grep -v "^$" | sort -u || true
 }
 
 # ---------------------------------------------------------------------------

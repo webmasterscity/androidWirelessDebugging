@@ -417,7 +417,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_scan_done(self, rc, out):
         self.set_busy(False)
-        if rc == 0 and out:
+        if out:
             parsed = parse_pipe_lines(out)
             found = list(parsed.items())
             if found:
