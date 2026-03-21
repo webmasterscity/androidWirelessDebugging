@@ -184,33 +184,46 @@ buscar_dispositivos() {
         fi
     done < <($ADB mdns services 2>/dev/null)
 
-    # Escaneo rápido — buscar en TODAS las redes locales (no solo la ruta por defecto,
-    # que puede ser una VPN en vez de la WiFi donde están los Android)
+    # Fase 1: Escanear IPs de dispositivos guardados en rango completo de puertos.
+    # Android wireless debugging usa puertos aleatorios en ~30000-50000 que
+    # cambian cada vez, así que una lista fija de puertos no sirve.
+    local ips_guardadas=()
+    if [[ -f "$DEVICES_FILE" ]]; then
+        while IFS='|' read -r _ addr; do
+            local saved_ip="${addr%:*}"
+            [[ -n "$saved_ip" ]] && ips_guardadas+=("$saved_ip")
+        done < "$DEVICES_FILE"
+    fi
+
+    for ip in "${ips_guardadas[@]}"; do
+        for port in $(seq 30000 50000) 5555; do
+            (timeout 0.08 bash -c "echo >/dev/tcp/${ip}/$port" 2>/dev/null && \
+                echo "${ip}:${port}" >> "$temp_file") &
+            (( port % 1000 == 0 )) && wait
+        done
+    done
+
+    # Fase 2: Descubrir nuevos dispositivos en la red local (puerto 5555 clásico)
     local redes_base=()
     while IFS= read -r net_ip; do
         local base="${net_ip%.*}"
         [[ -n "$base" && "$base" != "127.0.0" ]] && redes_base+=("$base")
     done < <(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
 
-    if [[ ${#redes_base[@]} -gt 0 ]]; then
-        local ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 120 125 130 140 142 145 150 200)
-        local puertos=(5555 33000 33279 37000 39000 39723 41000 42000 43000 43543 44000 44335 44359 45000)
-
-        for red_base in "${redes_base[@]}"; do
-            for oct in "${ips[@]}"; do
-                for puerto in "${puertos[@]}"; do
-                    (timeout 0.15 bash -c "echo >/dev/tcp/${red_base}.${oct}/$puerto" 2>/dev/null && \
-                        echo "${red_base}.${oct}:${puerto}" >> "$temp_file") &
-                done
-            done
+    local discovery_ips=(1 2 3 4 5 10 100 101 102 103 104 105 106 107 108 109 110 120 125 130 140 142 145 150 200)
+    for red_base in "${redes_base[@]}"; do
+        for oct in "${discovery_ips[@]}"; do
+            (timeout 0.15 bash -c "echo >/dev/tcp/${red_base}.${oct}/5555" 2>/dev/null && \
+                echo "${red_base}.${oct}:5555" >> "$temp_file") &
         done
-        wait
+    done
 
-        if [[ -s "$temp_file" ]]; then
-            while IFS= read -r addr; do
-                [[ -n "$addr" ]] && encontrados+="${addr}|Escaneado\n"
-            done < "$temp_file"
-        fi
+    wait
+
+    if [[ -s "$temp_file" ]]; then
+        while IFS= read -r addr; do
+            [[ -n "$addr" ]] && encontrados+="${addr}|Escaneado\n"
+        done < "$temp_file"
     fi
 
     rm -f "$temp_file"
