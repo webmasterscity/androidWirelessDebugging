@@ -82,10 +82,12 @@ uninstall() {
     echo "Desinstalando Android Wireless Debugging..."
     echo ""
 
-    if [[ -f "$INSTALL_DIR/conectar-android.sh" ]]; then
-        rm -f "$INSTALL_DIR/conectar-android.sh"
-        print_success "Script eliminado"
-    fi
+    for f in conectar-android.sh conectar-android-adb.sh conectar-android-gui.py; do
+        if [[ -f "$INSTALL_DIR/$f" ]]; then
+            rm -f "$INSTALL_DIR/$f"
+            print_success "$f eliminado"
+        fi
+    done
 
     if [[ -f "$APPS_DIR/conectar-android.desktop" ]]; then
         rm -f "$APPS_DIR/conectar-android.desktop"
@@ -120,17 +122,19 @@ fi
 print_header
 
 # Verificar que estamos en el directorio correcto
-if [[ ! -f "$SCRIPT_DIR/conectar-android.sh" ]]; then
-    print_error "No se encontró conectar-android.sh en el directorio actual"
-    print_info "Ejecuta este script desde el directorio del proyecto"
-    exit 1
-fi
+for f in conectar-android.sh conectar-android-adb.sh conectar-android-gui.py; do
+    if [[ ! -f "$SCRIPT_DIR/$f" ]]; then
+        print_error "No se encontró $f en el directorio del proyecto"
+        print_info "Ejecuta este script desde el directorio del proyecto"
+        exit 1
+    fi
+done
 
 echo "Este script instalará:"
-echo "  - Script principal en ~/.local/bin/"
+echo "  - Launcher + backend ADB + GUI GTK4 en ~/.local/bin/"
 echo "  - Acceso directo en el menú de aplicaciones"
 echo "  - Acceso directo en el escritorio (un clic para conectar)"
-echo "  - Emparejamiento por QR en un entorno privado de Python"
+echo "  - Soporte QR en un entorno privado de Python"
 echo ""
 
 # Verificar e instalar dependencias
@@ -152,11 +156,12 @@ else
     ADB_MISSING=1
 fi
 
-# Zenity
-if command -v zenity &> /dev/null; then
-    print_success "Zenity encontrado"
+# Python3 + GTK4/Adwaita (requerido para la GUI)
+if python3 -c "import gi; gi.require_version('Gtk','4.0'); gi.require_version('Adw','1')" 2>/dev/null; then
+    print_success "Python3 + GTK4 + Adwaita encontrados"
 else
-    print_warning "Zenity no encontrado (opcional, para interfaz gráfica)"
+    print_warning "Python3 con GTK4/Adwaita no encontrado (requerido para la GUI)"
+    DEPS_MISSING=1
 fi
 
 # Soporte QR vía Python
@@ -185,19 +190,19 @@ if [[ $DEPS_MISSING -eq 1 ]]; then
     if command -v apt &> /dev/null; then
         PKG_MGR="apt"
         PKG_INSTALL="sudo apt install -y"
-        PACKAGES="adb zenity libnotify-bin"
+        PACKAGES="adb python3-gi gir1.2-adw-1 libnotify-bin"
     elif command -v dnf &> /dev/null; then
         PKG_MGR="dnf"
         PKG_INSTALL="sudo dnf install -y"
-        PACKAGES="android-tools zenity libnotify"
+        PACKAGES="android-tools python3-gobject gtk4 libadwaita libnotify"
     elif command -v pacman &> /dev/null; then
         PKG_MGR="pacman"
         PKG_INSTALL="sudo pacman -S --noconfirm"
-        PACKAGES="android-tools zenity libnotify"
+        PACKAGES="android-tools python-gobject gtk4 libadwaita libnotify"
     elif command -v zypper &> /dev/null; then
         PKG_MGR="zypper"
         PKG_INSTALL="sudo zypper install -y"
-        PACKAGES="android-tools zenity libnotify-tools"
+        PACKAGES="android-tools python3-gobject gtk4 libadwaita libnotify-tools"
     else
         print_error "No se detectó un gestor de paquetes conocido"
         print_info "Instala las dependencias manualmente antes de continuar"
@@ -229,10 +234,18 @@ echo ""
 mkdir -p "$INSTALL_DIR"
 mkdir -p "$APPS_DIR"
 
-# Copiar script principal
+# Copiar scripts
 cp "$SCRIPT_DIR/conectar-android.sh" "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/conectar-android.sh"
-print_success "Script instalado en $INSTALL_DIR/conectar-android.sh"
+print_success "Launcher instalado en $INSTALL_DIR/conectar-android.sh"
+
+cp "$SCRIPT_DIR/conectar-android-adb.sh" "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/conectar-android-adb.sh"
+print_success "Backend ADB instalado en $INSTALL_DIR/conectar-android-adb.sh"
+
+cp "$SCRIPT_DIR/conectar-android-gui.py" "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/conectar-android-gui.py"
+print_success "GUI GTK4 instalada en $INSTALL_DIR/conectar-android-gui.py"
 
 # Crear archivo .desktop con ruta correcta
 DESKTOP_CONTENT="[Desktop Entry]

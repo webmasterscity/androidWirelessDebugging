@@ -7,6 +7,7 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
 ![Shell](https://img.shields.io/badge/shell-bash-orange)
+![GTK](https://img.shields.io/badge/GUI-GTK4%2FAdwaita-purple)
 
 ## Vista Previa
 
@@ -21,7 +22,8 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 - **Conexión directa por IP**: Ingresa manualmente la IP y puerto del dispositivo
 - **Emparejamiento de dispositivos**: Soporte completo para el nuevo sistema de emparejamiento de Android 11+, con código o QR
 - **Búsqueda automática**: Escanea la red local para encontrar dispositivos Android
-- **Interfaz gráfica**: Usa Zenity para diálogos amigables (también funciona en terminal)
+- **Interfaz gráfica nativa**: GUI moderna con GTK4/Adwaita (también funciona en terminal)
+- **Gestión de dispositivos**: Guarda, conecta rápido y administra múltiples dispositivos
 - **Guarda configuración**: Recuerda la última conexión exitosa
 - **Instalación sencilla**: Un solo comando instala todo automáticamente
 
@@ -29,8 +31,8 @@ Permite depurar aplicaciones Android sin cables USB, con una interfaz simple e i
 
 - Linux (Ubuntu, Debian, Fedora, Arch, etc.)
 - ADB (Android Debug Bridge)
-- Zenity (opcional, para interfaz gráfica)
-- Python 3 con soporte `venv` para el emparejamiento por QR
+- Python 3 con GTK4 y libadwaita (para la interfaz gráfica)
+- Python 3 con soporte `venv` (para emparejamiento por QR)
 - libnotify (opcional, para notificaciones)
 
 ## Instalación
@@ -44,7 +46,7 @@ cd androidWirelessDebugging
 ```
 
 El instalador automáticamente:
-- Instala las dependencias necesarias (ADB, Zenity)
+- Instala las dependencias necesarias (ADB, GTK4/Adwaita)
 - Prepara un entorno virtual privado para el soporte QR si hace falta
 - Crea un **acceso directo en tu escritorio** para acceso rápido
 - Agrega la aplicación al menú de aplicaciones
@@ -54,21 +56,16 @@ El instalador automáticamente:
 
 ```bash
 # Instalar dependencias
-sudo apt install adb zenity libnotify-bin
-
-# El soporte QR se prepara automáticamente al ejecutar ./install.sh
-# Si quieres prepararlo manualmente:
-python3 -m venv ~/.config/conectar-android/qr-venv
-~/.config/conectar-android/qr-venv/bin/pip install qrcode[pil]
+sudo apt install adb python3-gi gir1.2-adw-1 libnotify-bin
 
 # Clonar repositorio
 git clone https://github.com/webmasterscity/androidWirelessDebugging.git
 cd androidWirelessDebugging
 
-# Copiar script
+# Copiar scripts
 mkdir -p ~/.local/bin
-cp conectar-android.sh ~/.local/bin/
-chmod +x ~/.local/bin/conectar-android.sh
+cp conectar-android.sh conectar-android-adb.sh conectar-android-gui.py ~/.local/bin/
+chmod +x ~/.local/bin/conectar-android*.sh ~/.local/bin/conectar-android-gui.py
 
 # Instalar acceso directo (opcional)
 cp conectar-android.desktop ~/.local/share/applications/
@@ -158,9 +155,10 @@ O manualmente:
 
 ```bash
 rm ~/.local/bin/conectar-android.sh
+rm ~/.local/bin/conectar-android-adb.sh
+rm ~/.local/bin/conectar-android-gui.py
 rm ~/.local/share/applications/conectar-android.desktop
 rm ~/Escritorio/conectar-android.desktop  # o ~/Desktop en inglés
-rm ~/.config/conectar-android.conf
 ```
 
 ## Contribuir
